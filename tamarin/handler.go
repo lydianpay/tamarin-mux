@@ -13,32 +13,38 @@ const (
 )
 
 type handler struct {
-	verbose               bool
-	handleFuncsGET        map[string][]http.HandlerFunc
-	handleFuncsPOST       map[string][]http.HandlerFunc
-	handleFuncsPATCH      map[string][]http.HandlerFunc
-	variableHandlersGET   map[string][]http.HandlerFunc
-	variableHandlersPOST  map[string][]http.HandlerFunc
-	variableHandlersPATCH map[string][]http.HandlerFunc
-	staticHandlersGET     map[string][]http.HandlerFunc
-	staticHandlersPOST    map[string][]http.HandlerFunc
-	staticHandlersPATCH   map[string][]http.HandlerFunc
+	verbose                bool
+	handleFuncsGET         map[string][]http.HandlerFunc
+	handleFuncsPOST        map[string][]http.HandlerFunc
+	handleFuncsPATCH       map[string][]http.HandlerFunc
+	variableHandlersGET    map[string][]http.HandlerFunc
+	variableHandlersPOST   map[string][]http.HandlerFunc
+	variableHandlersPATCH  map[string][]http.HandlerFunc
+	staticHandlersGET      map[string][]http.HandlerFunc
+	staticHandlersPOST     map[string][]http.HandlerFunc
+	staticHandlersPATCH    map[string][]http.HandlerFunc
+	handleFuncsDELETE      map[string][]http.HandlerFunc
+	variableHandlersDELETE map[string][]http.HandlerFunc
+	staticHandlersDELETE   map[string][]http.HandlerFunc
 }
 
 // NewHandler returns a fresh Handler / Mux.
 // The verbose parameter controls log output
 func NewHandler(verbose bool) *handler {
 	return &handler{
-		verbose:               verbose,
-		handleFuncsGET:        make(map[string][]http.HandlerFunc),
-		handleFuncsPOST:       make(map[string][]http.HandlerFunc),
-		variableHandlersGET:   make(map[string][]http.HandlerFunc),
-		variableHandlersPOST:  make(map[string][]http.HandlerFunc),
-		staticHandlersGET:     make(map[string][]http.HandlerFunc),
-		staticHandlersPOST:    make(map[string][]http.HandlerFunc),
-		handleFuncsPATCH:      make(map[string][]http.HandlerFunc),
-		variableHandlersPATCH: make(map[string][]http.HandlerFunc),
-		staticHandlersPATCH:   make(map[string][]http.HandlerFunc),
+		verbose:                verbose,
+		handleFuncsGET:         make(map[string][]http.HandlerFunc),
+		handleFuncsPOST:        make(map[string][]http.HandlerFunc),
+		variableHandlersGET:    make(map[string][]http.HandlerFunc),
+		variableHandlersPOST:   make(map[string][]http.HandlerFunc),
+		staticHandlersGET:      make(map[string][]http.HandlerFunc),
+		staticHandlersPOST:     make(map[string][]http.HandlerFunc),
+		handleFuncsPATCH:       make(map[string][]http.HandlerFunc),
+		variableHandlersPATCH:  make(map[string][]http.HandlerFunc),
+		staticHandlersPATCH:    make(map[string][]http.HandlerFunc),
+		handleFuncsDELETE:      make(map[string][]http.HandlerFunc),
+		variableHandlersDELETE: make(map[string][]http.HandlerFunc),
+		staticHandlersDELETE:   make(map[string][]http.HandlerFunc),
 	}
 }
 
@@ -55,6 +61,11 @@ func (h *handler) Get(path string, handlers ...EndpointHandlerFunc) *handler {
 // Patch builds a PATCH endpoint and adds it to the list of sequences
 func (h *handler) Patch(path string, handlers ...EndpointHandlerFunc) *handler {
 	return h.withEndpoint(NewEndpoint(path).WithHandlers(handlers...).WithMethod(http.MethodPatch))
+}
+
+// Delete builds a DELETE endpoint and adds it to the list of sequences
+func (h *handler) Delete(path string, handlers ...EndpointHandlerFunc) *handler {
+	return h.withEndpoint(NewEndpoint(path).WithHandlers(handlers...).WithMethod(http.MethodDelete))
 }
 
 // PostF adds a POST handler to the list of sequences
@@ -81,7 +92,7 @@ func (h *handler) GetF(path string, handlers ...http.HandlerFunc) *handler {
 	return h
 }
 
-// PatchF adds a GET handler to the list of sequences
+// PatchF adds a PATCH handler to the list of sequences
 func (h *handler) PatchF(path string, handlers ...http.HandlerFunc) *handler {
 	if pathIsVariable(path) {
 		h.variableHandlersPATCH[path] = handlers
@@ -89,6 +100,18 @@ func (h *handler) PatchF(path string, handlers ...http.HandlerFunc) *handler {
 		h.staticHandlersPATCH[path] = handlers
 	} else {
 		h.handleFuncsPATCH[path] = handlers
+	}
+	return h
+}
+
+// DeleteF adds a DELETE handler to the list of sequences
+func (h *handler) DeleteF(path string, handlers ...http.HandlerFunc) *handler {
+	if pathIsVariable(path) {
+		h.variableHandlersDELETE[path] = handlers
+	} else if pathIsStatic(path) {
+		h.staticHandlersDELETE[path] = handlers
+	} else {
+		h.handleFuncsDELETE[path] = handlers
 	}
 	return h
 }
@@ -124,6 +147,14 @@ func (s *handler) withEndpoint(e *endpoint) *handler {
 		} else {
 			s.handleFuncsPATCH[e.path] = []http.HandlerFunc{e.Handle}
 		}
+	case http.MethodDelete:
+		if pathIsVariable(e.path) {
+			s.variableHandlersDELETE[e.path] = []http.HandlerFunc{e.Handle}
+		} else if pathIsStatic(e.path) {
+			s.staticHandlersDELETE[e.path] = []http.HandlerFunc{e.Handle}
+		} else {
+			s.handleFuncsDELETE[e.path] = []http.HandlerFunc{e.Handle}
+		}
 	default:
 		log.Printf("Don't yet handle the HTTP Method '%s'", e.method)
 	}
@@ -149,12 +180,21 @@ func (s *handler) WithPostEndpoint(e *endpoint) *handler {
 	return s.withEndpoint(e)
 }
 
-// WithPatchEndpoint adds a POST endpoint to the list of endpoints served
+// WithPatchEndpoint adds a PATCH endpoint to the list of endpoints served
 func (s *handler) WithPatchEndpoint(e *endpoint) *handler {
 	if e == nil {
 		return s
 	}
 	e.method = http.MethodPatch
+	return s.withEndpoint(e)
+}
+
+// WithDeleteEndpoint adds a DELETE endpoint to the list of endpoints served
+func (s *handler) WithDeleteEndpoint(e *endpoint) *handler {
+	if e == nil {
+		return s
+	}
+	e.method = http.MethodDelete
 	return s.withEndpoint(e)
 }
 
@@ -185,6 +225,14 @@ func (s *handler) WithHandleFuncs(path, httpMethod string, handlerFuncs ...http.
 			s.staticHandlersPATCH[path] = handlerFuncs
 		} else {
 			s.handleFuncsPATCH[path] = handlerFuncs
+		}
+	case http.MethodDelete:
+		if pathIsVariable(path) {
+			s.variableHandlersDELETE[path] = handlerFuncs
+		} else if pathIsStatic(path) {
+			s.staticHandlersDELETE[path] = handlerFuncs
+		} else {
+			s.handleFuncsDELETE[path] = handlerFuncs
 		}
 	case http.MethodOptions:
 
@@ -225,6 +273,15 @@ func (s *handler) HandlerNames() []string {
 	for key := range s.staticHandlersPATCH {
 		names = append(names, fmt.Sprintf("[%s] [URL refers to static content] -> %s ", http.MethodPatch, key))
 	}
+	for key := range s.handleFuncsDELETE {
+		names = append(names, fmt.Sprintf("[%s]                                -> %s", http.MethodDelete, key))
+	}
+	for key := range s.variableHandlersDELETE {
+		names = append(names, fmt.Sprintf("[%s] [URL contains variable]        -> %s ", http.MethodDelete, key))
+	}
+	for key := range s.staticHandlersDELETE {
+		names = append(names, fmt.Sprintf("[%s] [URL refers to static content] -> %s ", http.MethodDelete, key))
+	}
 	return names
 }
 
@@ -259,6 +316,8 @@ func (s *handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		endpoints, OK = s.handleFuncsPOST[reqPath]
 	case http.MethodPatch:
 		endpoints, OK = s.handleFuncsPATCH[reqPath]
+	case http.MethodDelete:
+		endpoints, OK = s.handleFuncsDELETE[reqPath]
 	}
 	if !OK {
 		endpoints = s.getVariableHandlerFuncsForPattern(req.URL.Path, req.Method)
@@ -298,6 +357,8 @@ func (h *handler) getVariableHandlerFuncsForPattern(path, httpMethod string) []h
 		candidateFuncs = h.variableHandlersPOST
 	case http.MethodPatch:
 		candidateFuncs = h.variableHandlersPATCH
+	case http.MethodDelete:
+		candidateFuncs = h.variableHandlersDELETE
 	default:
 		return nil
 	}
@@ -336,6 +397,8 @@ func (h *handler) getStaticHandlerFuncsForPattern(path, httpMethod string) []htt
 		candidateFuncs = h.staticHandlersPOST
 	case http.MethodPatch:
 		candidateFuncs = h.staticHandlersPATCH
+	case http.MethodDelete:
+		candidateFuncs = h.staticHandlersDELETE
 	default:
 		return nil
 	}
