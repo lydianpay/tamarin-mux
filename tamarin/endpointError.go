@@ -2,6 +2,7 @@ package tamarin
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 )
@@ -31,13 +32,25 @@ func FailWithJSONStatus(code int, v any, err error) *EndpointError {
 // SuceedWithJSONStatus returns a 200 and JSON-marshalled response body
 func SuceedWithJSONStatus(responseBody any, rw http.ResponseWriter) *EndpointError {
 	if responseBody == nil || rw == nil {
-		return FailWithErrorMessage(http.StatusInternalServerError, "Internal Server Error", fmt.Errorf("responseBody or Response Body was nil"))
+		return FailWithErrorMessage(http.StatusInternalServerError, "Internal Server Error", errors.New("responseBody or Response Writer was nil"))
 	}
 	jsonBytes, err := json.Marshal(responseBody)
 	if err != nil {
 		return FailWithErrorMessage(http.StatusInternalServerError, "Internal Server Error", fmt.Errorf("unable to marshal response body : %v", err))
 	}
+	rw.Header().Add("Content-Type", "application/json")
 	rw.WriteHeader(http.StatusOK)
 	rw.Write(jsonBytes)
+	return nil
+}
+
+// SuceedWithMessage returns a 200 and string response body
+func SuceedWithMessage(responseMessage string, rw http.ResponseWriter) *EndpointError {
+	if rw == nil {
+		return FailWithErrorMessage(http.StatusInternalServerError, "Internal Server Error", errors.New("Response Writer was nil"))
+	}
+	rw.Header().Add("Content-Type", "text/plain")
+	rw.WriteHeader(http.StatusOK)
+	rw.Write([]byte(responseMessage))
 	return nil
 }
