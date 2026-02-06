@@ -26,6 +26,9 @@ type handler struct {
 	handleFuncsDELETE      map[string][]http.HandlerFunc
 	variableHandlersDELETE map[string][]http.HandlerFunc
 	staticHandlersDELETE   map[string][]http.HandlerFunc
+	handleFuncsPUT         map[string][]http.HandlerFunc
+	variableHandlersPUT    map[string][]http.HandlerFunc
+	staticHandlersPUT      map[string][]http.HandlerFunc
 }
 
 // NewHandler returns a fresh Handler / Mux.
@@ -45,6 +48,9 @@ func NewHandler(verbose bool) *handler {
 		handleFuncsDELETE:      make(map[string][]http.HandlerFunc),
 		variableHandlersDELETE: make(map[string][]http.HandlerFunc),
 		staticHandlersDELETE:   make(map[string][]http.HandlerFunc),
+		handleFuncsPUT:         make(map[string][]http.HandlerFunc),
+		variableHandlersPUT:    make(map[string][]http.HandlerFunc),
+		staticHandlersPUT:      make(map[string][]http.HandlerFunc),
 	}
 }
 
@@ -66,6 +72,11 @@ func (h *handler) Patch(path string, handlers ...EndpointHandlerFunc) *handler {
 // Delete builds a DELETE endpoint and adds it to the list of sequences
 func (h *handler) Delete(path string, handlers ...EndpointHandlerFunc) *handler {
 	return h.withEndpoint(NewEndpoint(path).WithHandlers(handlers...).WithMethod(http.MethodDelete))
+}
+
+// Put builds a PUT endpoint and adds it to the list of sequences
+func (h *handler) Put(path string, handlers ...EndpointHandlerFunc) *handler {
+	return h.withEndpoint(NewEndpoint(path).WithHandlers(handlers...).WithMethod(http.MethodPut))
 }
 
 // PostF adds a POST handler to the list of sequences
@@ -116,6 +127,18 @@ func (h *handler) DeleteF(path string, handlers ...http.HandlerFunc) *handler {
 	return h
 }
 
+// PutF adds a Put handler to the list of sequences
+func (h *handler) PutF(path string, handlers ...http.HandlerFunc) *handler {
+	if pathIsVariable(path) {
+		h.variableHandlersPUT[path] = handlers
+	} else if pathIsStatic(path) {
+		h.staticHandlersPUT[path] = handlers
+	} else {
+		h.handleFuncsPUT[path] = handlers
+	}
+	return h
+}
+
 // withEndpoint adds an Endpoint (HandlerFunc wrapper) to the list of HandlerFuncs to be
 // executed for a given path and method
 func (s *handler) withEndpoint(e *endpoint) *handler {
@@ -154,6 +177,14 @@ func (s *handler) withEndpoint(e *endpoint) *handler {
 			s.staticHandlersDELETE[e.path] = []http.HandlerFunc{e.Handle}
 		} else {
 			s.handleFuncsDELETE[e.path] = []http.HandlerFunc{e.Handle}
+		}
+	case http.MethodPut:
+		if pathIsVariable(e.path) {
+			s.variableHandlersPUT[e.path] = []http.HandlerFunc{e.Handle}
+		} else if pathIsStatic(e.path) {
+			s.staticHandlersPUT[e.path] = []http.HandlerFunc{e.Handle}
+		} else {
+			s.handleFuncsPUT[e.path] = []http.HandlerFunc{e.Handle}
 		}
 	default:
 		log.Printf("Don't yet handle the HTTP Method '%s'", e.method)
@@ -198,6 +229,15 @@ func (s *handler) WithDeleteEndpoint(e *endpoint) *handler {
 	return s.withEndpoint(e)
 }
 
+// WithPutEndpoint adds a PUT endpoint to the list of endpoints served
+func (s *handler) WithPutEndpoint(e *endpoint) *handler {
+	if e == nil {
+		return s
+	}
+	e.method = http.MethodPut
+	return s.withEndpoint(e)
+}
+
 // WithEndpoint adds HandlerFuncs to the list of HandlerFuncs to be
 // executed for a given path and method
 func (s *handler) WithHandleFuncs(path, httpMethod string, handlerFuncs ...http.HandlerFunc) *handler {
@@ -233,6 +273,14 @@ func (s *handler) WithHandleFuncs(path, httpMethod string, handlerFuncs ...http.
 			s.staticHandlersDELETE[path] = handlerFuncs
 		} else {
 			s.handleFuncsDELETE[path] = handlerFuncs
+		}
+	case http.MethodPut:
+		if pathIsVariable(path) {
+			s.variableHandlersPUT[path] = handlerFuncs
+		} else if pathIsStatic(path) {
+			s.staticHandlersPUT[path] = handlerFuncs
+		} else {
+			s.handleFuncsPUT[path] = handlerFuncs
 		}
 	case http.MethodOptions:
 
@@ -282,6 +330,15 @@ func (s *handler) HandlerNames() []string {
 	for key := range s.staticHandlersDELETE {
 		names = append(names, fmt.Sprintf("[%s] [URL refers to static content] -> %s ", http.MethodDelete, key))
 	}
+	for key := range s.handleFuncsPUT {
+		names = append(names, fmt.Sprintf("[%s]                                -> %s", http.MethodPut, key))
+	}
+	for key := range s.variableHandlersPUT {
+		names = append(names, fmt.Sprintf("[%s] [URL contains variable]        -> %s ", http.MethodPut, key))
+	}
+	for key := range s.staticHandlersPUT {
+		names = append(names, fmt.Sprintf("[%s] [URL refers to static content] -> %s ", http.MethodPut, key))
+	}
 	return names
 }
 
@@ -318,6 +375,8 @@ func (s *handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		endpoints, OK = s.handleFuncsPATCH[reqPath]
 	case http.MethodDelete:
 		endpoints, OK = s.handleFuncsDELETE[reqPath]
+	case http.MethodPut:
+		endpoints, OK = s.handleFuncsPUT[reqPath]
 	}
 	if !OK {
 		endpoints = s.getVariableHandlerFuncsForPattern(req.URL.Path, req.Method)
@@ -359,6 +418,8 @@ func (h *handler) getVariableHandlerFuncsForPattern(path, httpMethod string) []h
 		candidateFuncs = h.variableHandlersPATCH
 	case http.MethodDelete:
 		candidateFuncs = h.variableHandlersDELETE
+	case http.MethodPut:
+		candidateFuncs = h.variableHandlersPUT
 	default:
 		return nil
 	}
@@ -399,6 +460,8 @@ func (h *handler) getStaticHandlerFuncsForPattern(path, httpMethod string) []htt
 		candidateFuncs = h.staticHandlersPATCH
 	case http.MethodDelete:
 		candidateFuncs = h.staticHandlersDELETE
+	case http.MethodPut:
+		candidateFuncs = h.staticHandlersPUT
 	default:
 		return nil
 	}
