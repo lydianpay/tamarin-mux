@@ -1,6 +1,7 @@
 package tamarin
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 )
@@ -38,6 +39,11 @@ func (e *endpoint) Handle(rw http.ResponseWriter, req *http.Request) {
 	for _, f := range e.sequence {
 		err := f(rw, req)
 		if err != nil {
+			if json.Valid([]byte(err.returnMessage)) {
+				rw.Header().Add("Content-Type", "application/json")
+			} else {
+				rw.Header().Add("Content-Type", "text/plain")
+			}
 			rw.WriteHeader(err.returnCode)
 			rw.Write([]byte(err.returnMessage))
 			log.Printf("Stopping sequence for '%s' due to error : %v", e.path, err.error)
