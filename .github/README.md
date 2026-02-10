@@ -11,8 +11,8 @@
 <div align="center">
 
 [![Go Report Card](https://goreportcard.com/badge/lydianpay/tamarin-mux)](https://goreportcard.com/report/lydianpay/tamarin-mux)
-[![Maintainability](https://qlty.sh/badges/1ae172fe-acf4-4764-b4ae-ebcc6f88ca38/maintainability.svg)](https://qlty.sh/gh/lydianpay/projects/tamarin-mux)
-[![Code Coverage](https://qlty.sh/badges/1ae172fe-acf4-4764-b4ae-ebcc6f88ca38/test_coverage.svg)](https://qlty.sh/gh/lydianpay/projects/tamarin-mux)
+[![Maintainability](https://qlty.sh/gh/lydianpay/projects/tamarin-mux/maintainability.svg)](https://qlty.sh/gh/lydianpay/projects/tamarin-mux)
+[![Code Coverage](https://qlty.sh/gh/lydianpay/projects/tamarin-mux/coverage.svg)](https://qlty.sh/gh/lydianpay/projects/tamarin-mux)
 [![CodeQL](https://github.com/lydianpay/tamarin-mux/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/lydianpay/tamarin-mux/actions/workflows/github-code-scanning/codeql)
 
 </div>
