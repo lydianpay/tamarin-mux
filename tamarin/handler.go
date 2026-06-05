@@ -384,7 +384,7 @@ func (s *handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			endpoints = s.getStaticHandlerFuncsForPattern(req.URL.Path, req.Method)
 			if endpoints == nil {
 				if s.verbose {
-					log.Printf("don't have a handler for %s", reqPath)
+					log.Printf("don't have a [%s] handler for %s", req.Method, strings.ReplaceAll(strings.ReplaceAll(reqPath, "\n", ""), "\r", ""))
 				}
 				rw.WriteHeader(http.StatusNotFound)
 				return
