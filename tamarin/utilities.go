@@ -7,7 +7,17 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
+
+// URLVarAtPosition returns the path segment at pos in a request URL path
+func URLVarAtPosition(url string, pos int) string {
+	split := strings.Split(url, "/")
+	if len(split) <= pos {
+		return ""
+	}
+	return split[pos]
+}
 
 func GetRequestBodyAndHeader(req *http.Request) ([]byte, http.Header, error) {
 	if req == nil {

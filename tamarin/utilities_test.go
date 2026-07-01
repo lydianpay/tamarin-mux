@@ -75,3 +75,27 @@ func TestUnmarshallJSONRequestBodyTo(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestURLVarAtPosition(t *testing.T) {
+	cases := []struct {
+		name string
+		url  string
+		pos  int
+		want string
+	}{
+		{"variable at position 2", "/application/ct7wg-abc", 2, "ct7wg-abc"},
+		{"static segment at position 1", "/application/ct7wg-abc", 1, "application"},
+		{"leading empty at position 0", "/application/ct7wg-abc", 0, ""},
+		{"trailing slash, missing var", "/application/", 2, ""},
+		{"no var segment", "/application", 2, ""},
+		{"position out of range", "/application", 9, ""},
+		{"deep path", "/accounts/acc-1/keys/key-9", 4, "key-9"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := URLVarAtPosition(tc.url, tc.pos); got != tc.want {
+				t.Errorf("URLVarAtPosition(%q, %d) = %q, want %q", tc.url, tc.pos, got, tc.want)
+			}
+		})
+	}
+}
